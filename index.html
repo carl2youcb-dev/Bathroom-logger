@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bathroom & Drinks Logger</title>
+  <meta name="theme-color" content="#2f7d32" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <style>
+    :root{
+      /* Cream theme */
+      --bg:#f7f1e3;          /* page background (cream) */
+      --card:#fffdf6;        /* card background (lighter cream) */
+      --text:#111111;        /* main text (near-black) */
+      --muted:#5a5a5a;       /* muted text */
+      --border:#d9c9a3;      /* borders */
+      --coral:#c85a54;       /* bathroom button (dark coral) */
+      --coral-shadow:#8f3e3a;
+      --green:#2f7d32;       /* drinks buttons (dark green) */
+      --green-shadow:#1f5321;
+      --danger:#b53b3b;      /* erase button */
+      --danger-shadow:#7b2929;
+      --chip:#f0e6cf;
+    }
+    html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    .container{max-width:820px;margin:0 auto;padding:16px}
+    header{position:sticky;top:0;z-index:5;background:linear-gradient(180deg,var(--bg) 70%,#0000);padding:12px 0 6px 0}
+    h1{font-size:1.35rem;margin:.25rem 0 .5rem 0;letter-spacing:.2px}
+    .sub{color:var(--muted);font-size:.92rem}
+
+    .grid{display:grid;gap:12px;grid-template-columns:1fr}
+    @media(min-width:760px){.grid{grid-template-columns:1fr 1fr}}
+
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;box-shadow:0 8px 24px rgba(0,0,0,.08)}
+    .card h2{font-size:1.05rem;margin:.25rem 0 8px}
+
+    .cta{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .btn{
+      flex:1;min-height:52px;appearance:none;border:none;border-radius:14px;
+      padding:14px 16px;font-size:1.05rem;font-weight:800;color:#fff;touch-action:manipulation
+    }
+    .btn.coral{background:var(--coral);box-shadow:0 6px 0 var(--coral-shadow)}
+    .btn.coral:active{transform:translateY(2px);box-shadow:0 4px 0 var(--coral-shadow)}
+    .btn.green{background:var(--green);box-shadow:0 6px 0 var(--green-shadow)}
+    .btn.green:active{transform:translateY(2px);box-shadow:0 4px 0 var(--green-shadow)}
+    .btn.ghost{
+      background:#efe7d4;color:var(--text);border:1px solid var(--border);box-shadow:none;font-weight:700
+    }
+    .btn.ghost:active{transform:translateY(1px)}
+
+    .statrow{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
+    .pill{border:1px solid var(--border);border-radius:999px;padding:8px 12px;background:var(--chip);color:#3d3d3d;font-weight:700}
+
+    .list{margin:10px 0 0 0;max-height:300px;overflow:auto;border-top:1px dashed var(--border)}
+    .row{display:flex;justify-content:space-between;align-items:center;padding:10px 4px;border-bottom:1px dashed var(--border);font-variant-numeric:tabular-nums}
+    .row small{color:var(--muted)}
+
+    .section-title{margin:18px 2px 8px;font-size:1rem;color:#3a3a3a}
+
+    details{background:var(--card);border:1px solid var(--border);border-radius:14px}
+    summary{cursor:pointer;list-style:none;padding:14px;font-weight:800}
+    summary::-webkit-details-marker{display:none}
+    .hist{padding:0 14px 12px}
+
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+    .tiny{
+      font-size:.92rem;border:1px solid var(--border);background:#efe7d4;color:#232323;
+      border-radius:999px;padding:8px 12px;font-weight:700
+    }
+    .tiny.danger{background:#f4d6d6;border-color:#e7b0b0;color:#5a1212}
+
+    .footer{color:var(--muted);font-size:.85rem;margin:20px 4px}
+    .a2hs-hint{margin-top:8px;font-size:.85rem;color:#3a3a3a}
+
+    /* Modal (custom input for iPhone compatibility) */
+    .modal-backdrop{
+      position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;padding:16px;z-index:50;
+    }
+    .modal{
+      width:min(520px, 100%);background:var(--card);border:1px solid var(--border);border-radius:16px;
+      box-shadow:0 20px 40px rgba(0,0,0,.25);padding:16px
+    }
+    .modal h3{margin:0 0 8px 0}
+    .modal p{margin:0 0 10px 0;color:var(--muted)}
+    .modal .field{display:flex;gap:10px;align-items:center;margin:10px 0 14px}
+    .modal input[type=number]{
+      flex:1;appearance:textfield;background:#fff;border:1px solid var(--border);border-radius:12px;
+      font-size:1.05rem;padding:12px 14px;color:#111;outline:none
+    }
+    .modal .actions{display:flex;gap:10px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Bathroom & Drinks Logger</h1>
+      <div class="sub">Tap to log bathroom visits and drinks. Totals reset each day; your full history stays saved on this device.</div>
+    </header>
+
+    <div class="grid">
+      <!-- Visits -->
+      <section class="card" id="visitsCard">
+        <h2>Bathroom Visits</h2>
+        <div class="cta">
+          <button id="btnVisit" class="btn coral" aria-label="Log bathroom visit">Log Bathroom Visit</button>
+        </div>
+        <div class="statrow">
+          <div class="pill">Today: <strong id="visitCount">0</strong> visits</div>
+          <div class="pill">Last visit: <strong id="lastVisit">—</strong></div>
+        </div>
+        <div class="toolbar">
+          <button id="btnUndoVisit" class="tiny" title="Delete last visit">Delete last visit</button>
+        </div>
+        <div class="section-title" id="visitDateHeader">Today&apos;s Visit Times</div>
+        <div class="list" id="visitList"></div>
+      </section>
+
+      <!-- Drinks -->
+      <section class="card" id="drinksCard">
+        <h2>Liquid Intake</h2>
+        <div class="cta">
+          <button id="btnDrink200" class="btn green" aria-label="Add 200 ml drink">+200&nbsp;ml Drink</button>
+          <button id="btnDrink100" class="btn green" aria-label="Add 100 ml">+100&nbsp;ml</button>
+        </div>
+        <div class="statrow">
+          <div class="pill">Today: <strong id="drinkTotal">0</strong> ml</div>
+          <div class="pill">Drinks: <strong id="drinkCount">0</strong></div>
+          <div class="pill">Last drink: <strong id="lastDrink">—</strong></div>
+        </div>
+        <div class="toolbar">
+          <button id="btnDeleteDrink" class="tiny" title="Delete last drink">Delete last drink</button>
+          <button id="btnAddCustom" class="tiny" title="Add custom amount">Add custom ml…</button>
+        </div>
+        <div class="section-title">Today&apos;s Drinks</div>
+        <div class="list" id="drinkList"></div>
+      </section>
+    </div>
+
+    <details id="historyWrap" style="margin-top:12px">
+      <summary>📘 History & Totals</summary>
+      <div class="hist">
+        <div class="toolbar">
+          <button class="tiny" id="btnExportCsv">Export CSV</button>
+          <button class="tiny danger" id="btnClear">Erase ALL data (careful)</button>
+        </div>
+        <div class="section-title">Recent Days</div>
+        <div id="history"></div>
+      </div>
+    </details>
+
+    <div class="footer">
+      Stored locally (no cloud). If you clear browser/app data or switch phones, history won’t transfer.
+      <div class="a2hs-hint">Tip: in Chrome on Android, open this page and use <strong>⋮ → Install app</strong> (or <strong>Add to Home screen</strong>) to get an icon.</div>
+    </div>
+  </div>
+
+  <!-- Custom Modal for iPhone-safe numeric input -->
+  <div id="modalBackdrop" class="modal-backdrop" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal" role="document">
+      <h3>Add Custom Drink</h3>
+      <p>Enter an amount in millilitres.</p>
+      <div class="field">
+        <label for="customMl" class="sr-only">Millilitres</label>
+        <input id="customMl" type="number" inputmode="numeric" min="1" max="5000" step="50" placeholder="e.g. 250" />
+      </div>
+      <div class="actions">
+        <button id="modalCancel" class="btn ghost" type="button">Cancel</button>
+        <button id="modalConfirm" class="btn green" type="button">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    const LS_KEY = 'bathroom_drinks_logger.v1';
+
+    /* ---------- Date helpers ---------- */
+    function todayKey(){
+      const d = new Date(); // local time
+      const y = d.getFullYear();
+      const m = String(d.getMonth()+1).padStart(2,'0');
+      const day = String(d.getDate()).padStart(2,'0');
+      return `${y}-${m}-${day}`;
+    }
+    function todayDisplay(){
+      const d = new Date();
+      const dd = String(d.getDate()).padStart(2,'0');
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const yyyy = d.getFullYear();
+      return `${dd}/${mm}/${yyyy}`;
+    }
+    function fmtTime(ts){
+      const d = new Date(ts);
+      const hh = String(d.getHours()).padStart(2,'0');
+      const mm = String(d.getMinutes()).padStart(2,'0');
+      return `${hh}:${mm}`;
+    }
+    function fmtDate(key){
+      const [y,m,d]=key.split('-');
+      return `${d}/${m}/${y}`;
+    }
+
+    /* ---------- Storage helpers ---------- */
+    function loadAll(){
+      try{ return JSON.parse(localStorage.getItem(LS_KEY)) || {}; }
+      catch{ return {}; }
+    }
+    function saveAll(db){ localStorage.setItem(LS_KEY, JSON.stringify(db)); }
+    function ensureDay(db, key){
+      if(!db[key]) db[key] = { visits: [], drinks: [] };
+    }
+    function sum(arr, pick){ return arr.reduce((a,x)=>a+(pick?x[pick]:x),0); }
+
+    /* ---------- UI refs ---------- */
+    const visitCount = document.getElementById('visitCount');
+    const lastVisit = document.getElementById('lastVisit');
+    const visitList = document.getElementById('visitList');
+    const visitDateHeader = document.getElementById('visitDateHeader');
+
+    const drinkTotal = document.getElementById('drinkTotal');
+    const drinkCount = document.getElementById('drinkCount');
+    const lastDrink = document.getElementById('lastDrink');
+    const drinkList = document.getElementById('drinkList');
+
+    const historyDiv = document.getElementById('history');
+
+    // Modal elements
+    const modalBackdrop = document.getElementById('modalBackdrop');
+    const modalConfirm = document.getElementById('modalConfirm');
+    const modalCancel = document.getElementById('modalCancel');
+    const customMlInput = document.getElementById('customMl');
+
+    /* ---------- Actions: Visits ---------- */
+    document.getElementById('btnVisit').addEventListener('click', () => {
+      const db = loadAll();
+      const key = todayKey();
+      ensureDay(db, key);
+      db[key].visits.push({ ts: Date.now() });
+      saveAll(db);
+      render();
+      vibrate();
+    });
+
+    document.getElementById('btnUndoVisit').addEventListener('click', () => {
+      const db = loadAll();
+      const key = todayKey();
+      if(!db[key] || db[key].visits.length===0) return;
+      db[key].visits.pop();
+      saveAll(db);
+      render();
+      vibrate(30);
+    });
+
+    /* ---------- Actions: Drinks ---------- */
+    document.getElementById('btnDrink200').addEventListener('click', () => addDrink(200));
+    document.getElementById('btnDrink100').addEventListener('click', () => addDrink(100));
+
+    document.getElementById('btnDeleteDrink').addEventListener('click', () => {
+      const db = loadAll();
+      const key = todayKey();
+      if(!db[key] || db[key].drinks.length===0) return;
+      db[key].drinks.pop();
+      saveAll(db);
+      render();
+      vibrate(30);
+    });
+
+    // Open modal (instead of prompt) so it works on iPhone and in PWA mode
+    document.getElementById('btnAddCustom').addEventListener('click', () => {
+      openModal();
+    });
+    modalCancel.addEventListener('click', closeModal);
+    modalConfirm.addEventListener('click', () => {
+      const cleaned = String(customMlInput.value || '').trim();
+      const ml = parseInt(cleaned, 10);
+      if(Number.isFinite(ml) && ml>0 && ml<=5000){
+        addDrink(ml);
+        closeModal(true);
+      } else {
+        alert('Please enter a valid number between 1 and 5000 ml.');
+      }
+    });
+
+    // Support Enter key to confirm
+    customMlInput.addEventListener('keydown', (e)=>{
+      if(e.key === 'Enter'){ modalConfirm.click(); }
+    });
+
+    function addDrink(ml){
+      const db = loadAll();
+      const key = todayKey();
+      ensureDay(db, key);
+      db[key].drinks.push({ ts: Date.now(), ml });
+      saveAll(db);
+      render();
+      vibrate();
+    }
+
+    /* ---------- Export & Clear ---------- */
+    document.getElementById('btnExportCsv').addEventListener('click', () => {
+      const db = loadAll();
+      const rows = [['date','type','time','ml']];
+      for(const key of Object.keys(db).sort()){
+        for(const v of db[key].visits){ rows.push([key,'visit',fmtTime(v.ts),'']); }
+        for(const d of db[key].drinks){ rows.push([key,'drink',fmtTime(d.ts),String(d.ml)]); }
+      }
+      const csv = rows.map(r=>r.map(x=>`"${String(x).replaceAll('"','""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv],{type:'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href=url; a.download='bathroom_drinks_history.csv'; a.click();
+      setTimeout(()=>URL.revokeObjectURL(url), 2000);
+    });
+
+    document.getElementById('btnClear').addEventListener('click', () => {
+      if(confirm('Erase ALL saved history on this device? This cannot be undone.')){
+        try { localStorage.removeItem(LS_KEY); } catch(_) {}
+        render();
+        vibrate(40);
+        alert('All data erased for this app.');
+      }
+    });
+
+    /* ---------- Modal helpers ---------- */
+    function openModal(){
+      modalBackdrop.style.display = 'flex';
+      modalBackdrop.setAttribute('aria-hidden','false');
+      customMlInput.value = '';
+      // On iOS, focusing after a short delay improves reliability
+      setTimeout(()=>customMlInput.focus(), 50);
+    }
+    function closeModal(added=false){
+      modalBackdrop.style.display = 'none';
+      modalBackdrop.setAttribute('aria-hidden','true');
+      if(!added){ vibrate(10); }
+    }
+
+    /* ---------- Misc helpers ---------- */
+    function vibrate(ms=20){ if(navigator.vibrate) navigator.vibrate(ms); }
+
+    /* ---------- Render ---------- */
+    function render(){
+      const db = loadAll();
+      const key = todayKey();
+      ensureDay(db, key);
+
+      // Update header date (auto-refresh also planned below)
+      visitDateHeader.textContent = `Today's Visit Times (${todayDisplay()})`;
+
+      // Visits today
+      const visits = db[key].visits;
+      visitCount.textContent = String(visits.length);
+      lastVisit.textContent = visits.length? fmtTime(visits.at(-1).ts) : '—';
+      visitList.innerHTML = visits.slice().reverse().map(v=>
+        `<div class="row"><div>Visit</div><small>${fmtTime(v.ts)}</small></div>`
+      ).join('') || `<div class="row"><small>No entries yet</small></div>`;
+
+      // Drinks today
+      const drinks = db[key].drinks;
+      const totalMl = sum(drinks,'ml');
+      drinkTotal.textContent = String(totalMl);
+      drinkCount.textContent = String(drinks.length);
+      lastDrink.textContent = drinks.length? `${fmtTime(drinks.at(-1).ts)} · ${drinks.at(-1).ml} ml` : '—';
+      drinkList.innerHTML = drinks.slice().reverse().map(d=>
+        `<div class="row"><div>${d.ml} ml</div><small>${fmtTime(d.ts)}</small></div>`
+      ).join('') || `<div class="row"><small>No entries yet</small></div>`;
+
+      // History (last 30 days)
+      const days = Object.keys(db).sort().reverse().slice(0, 30);
+      const rows = days.map(k=>{
+        const vCount = db[k].visits.length;
+        const dTotal = sum(db[k].drinks,'ml');
+        const dCount = db[k].drinks.length;
+        return `<div class="row"><div><strong>${fmtDate(k)}</strong></div>
+                <div><small>${vCount} visits</small> · <small>${dCount} drinks</small> · <strong>${dTotal} ml</strong></div></div>`;
+      });
+      historyDiv.innerHTML = rows.join('') || '<div class="row"><small>No history yet</small></div>';
+    }
+
+    // Auto re-render right after midnight so header date and daily totals roll over
+    function scheduleMidnightRefresh(){
+      const now = new Date();
+      const midnight = new Date(now);
+      midnight.setHours(24,0,0,0); // next midnight
+      const ms = midnight - now;
+      setTimeout(() => {
+        render();
+        scheduleMidnightRefresh();
+      }, ms);
+    }
+
+    // First paint
+    render();
+    scheduleMidnightRefresh();
+
+    // ---- PWA: register service worker ----
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(console.error);
+      });
+    }
+  })();
+  </script>
+</body>
+</html>
